@@ -275,6 +275,7 @@
   function stopAll() {
     clearInterval(cam.timer); cam.timer = 0; cam.det = null; stopStream();
     pip.classList.add('hidden'); $('#btn-cam').classList.remove('on');
+    O.live.on = false; document.body.classList.remove('live'); wake(false);
   }
 
   /* ---------- calibrage ---------- */
@@ -309,7 +310,7 @@
     cv.onpointerup = () => { cam.drag = -1; };
     $('#cc-reset').onclick = () => { cam.pts = []; upd(); };
     $('#cc-x').onclick = () => { stopAll(); close(); };
-    ok.onclick = () => { store.set('cam-calib', { dev: cam.deviceId, pts: cam.pts }); startDetection(); show('run'); };
+    ok.onclick = () => { store.set('cam-calib', { dev: cam.deviceId, pts: cam.pts }); startDetection(); if (cam.autoClose) close(); else show('run'); };
 
     cam.drawTimer = setInterval(() => {
       ctx.drawImage(v, 0, 0, W, H);
@@ -366,6 +367,7 @@
     clearInterval(cam.timer);
     cam.timer = setInterval(tick, 110);
     pip.classList.remove('hidden'); $('#btn-cam').classList.add('on');
+    O.live.on = true; document.body.classList.add('live'); wake(true);
   }
 
   function flash(text, ms = 1800) { cam.flash = { text, until: performance.now() + ms }; }
@@ -433,12 +435,34 @@
     }
   }
 
+
+  /* ---------- écran allumé + démarrage automatique ---------- */
+  let wakeLock = null;
+  async function wake(on) {
+    try {
+      if (on && navigator.wakeLock && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+      if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && cam.det) wake(true); });
+
+  /** appelé au lancement d'une partie : ouvre la caméra et reprend le dernier calibrage, sans repasser par les réglages */
+  async function autoStart() {
+    if (cam.det || !navigator.mediaDevices) return;
+    cam.autoClose = true;
+    try { await startStream(); } catch (e) { open(); return show('setup', 'Impossible d’ouvrir la caméra : ' + (e && e.message ? e.message : e)); }
+    const saved = store.get('cam-calib', null);
+    if (saved && saved.dev === cam.deviceId && saved.pts && saved.pts.length === 4) { cam.pts = saved.pts; startDetection(); flash('Caméra prête', 2500); }
+    else { cam.pts = []; open(); show('calib'); }
+  }
+
   function viewRun() {
     const v = cam.video, vw = (v && v.videoWidth) || 1280, vh = (v && v.videoHeight) || 720;
     sheet.innerHTML = `<h3>Caméra active</h3>
       <canvas id="cam-live" width="640" height="${Math.round((640 * vh) / vw)}"></canvas>
       <div class="cam-st" id="cam-st">…</div>
       <label class="fld rng">Sensibilité<input type="range" id="cam-thr" min="12" max="60" value="${72 - cam.thr}"><small>Si elle rate des fléchettes, monte-la. Si elle en voit trop, baisse-la.</small></label>
+      <label class="opt${O.live.speech ? ' on' : ''}" id="cam-speech" role="button"><span><b>Annonces vocales</b><small>Dit le score de chaque fléchette et le joueur suivant.</small></span><i class="sw"></i></label>
       <label class="opt${cam.grid ? ' on' : ''}" id="cam-grid" role="button"><span><b>Quadrillage</b><small>Montre la cible repérée sur l’image.</small></span><i class="sw"></i></label>
       <div class="sheet-actions"><button class="btn primary" id="cam-ok">Fermer</button>
         <button class="btn ghost" id="cam-ref">Nouvelle image de référence</button>
@@ -446,11 +470,12 @@
         <button class="btn ghost" id="cam-off">Arrêter la caméra</button></div>`;
     $('#cam-ok').onclick = close;
     $('#cam-thr').oninput = (e) => { cam.thr = 72 - +e.target.value; store.set('cam-thr', cam.thr); if (cam.det) cam.det.thr = cam.thr; };
+    $('#cam-speech').onclick = (e) => { O.live.speech = !O.live.speech; store.set('speech', O.live.speech); e.currentTarget.classList.toggle('on', O.live.speech); if (O.live.speech && window.speechSynthesis) { const u = new SpeechSynthesisUtterance('Annonces activées'); u.lang = 'fr-FR'; speechSynthesis.speak(u); } };
     $('#cam-grid').onclick = (e) => { cam.grid = !cam.grid; e.currentTarget.classList.toggle('on', cam.grid); };
     $('#cam-ref').onclick = () => { if (cam.det) { cam.det.resetEmpty(); cam.det.prev = null; flash('Référence en cours…'); } };
     $('#cam-re').onclick = () => { cam.pts = []; clearInterval(cam.timer); cam.det = null; show('calib'); };
     $('#cam-off').onclick = () => { stopAll(); close(); };
   }
 
-  O.camera = { Detector, solveH, warp, cam, show, startDetection };
+  O.camera = { Detector, solveH, warp, cam, show, startDetection, autoStart };
 })();

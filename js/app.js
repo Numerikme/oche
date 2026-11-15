@@ -10,6 +10,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const mk = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   U.buildDefs($('#defs-svg'));
+  const live = (O.live = O.live || { on: false, speech: store.get('speech', true) });
 
   const GAMES = [
     { id: '301', type: 'x01', start: 301, big: '301', small: 'Descends à zéro, vite.' },
@@ -18,7 +19,7 @@
     { id: 'cricket', type: 'cricket', name: 'Cricket', wide: true, small: 'Ferme du 20 au 15 et le bull, marque des points.' },
     { id: 'clock', type: 'clock', name: "Tour de l'horloge", wide: true, small: 'Du 1 au 20 dans l’ordre, puis le bull.' },
   ];
-  const setup = { game: store.get('game-id', '501'), names: store.get('names', ['', '']), doubleOut: store.get('double-out', true), advance: store.get('advance', false) };
+  const setup = { game: store.get('game-id', '501'), names: store.get('names', ['', '']), doubleOut: store.get('double-out', true), advance: store.get('advance', false), useCam: store.get('useCam', false) };
   if (!GAMES.some((g) => g.id === setup.game)) setup.game = '501';
   if (!Array.isArray(setup.names) || !setup.names.length) setup.names = ['', ''];
 
@@ -66,7 +67,8 @@
     };
     if (g.type === 'x01') sw('doubleOut', 'Sortie en double', 'Pour finir, il faut terminer sur un double (ou le bull).');
     else if (g.type === 'clock') sw('advance', 'Doubles et triples font avancer', 'Un double compte 2 cases, un triple 3.');
-    else root.appendChild(mk('div', 'note', 'Les points ne comptent que si un adversaire n’a pas encore fermé le numéro. Idéal à 2 ou 3 joueurs.'));
+    else if (g.type === 'cricket') root.appendChild(mk('div', 'note', 'Les points ne comptent que si un adversaire n’a pas encore fermé le numéro. Idéal à 2 ou 3 joueurs.'));
+    if (navigator.mediaDevices) sw('useCam', 'Jouer avec la caméra', 'Le téléphone, posé face à la cible, compte les fléchettes tout seul.');
   }
   function renderResume() {
     const root = $('#resume');
@@ -143,6 +145,7 @@
     refresh(true);
     if (!store.get('coached', false)) $('#coach').classList.remove('gone'); else $('#coach').classList.add('gone');
     setTimeout(turnPop, 250);
+    if (setup.useCam && O.camera) O.camera.autoStart();
   }
   const speaker = () => '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
 
@@ -347,7 +350,7 @@
     board.addDart(h.x, h.y, p.color, {
       onLand() {
         A.thud();
-        impact(h, p.color);
+        impact(h, p.color, ev);
         events(ev, h);
         refresh(false);
         if (state.phase === 'over') winSequence(); else { busy = false; updateButtons(); }
@@ -361,11 +364,12 @@
     save(); A.tick(); callout('Raté', 'small'); refresh(false);
   }
 
-  function impact(h, color) {
+  function impact(h, color, ev) {
     board.ripple(h.x, h.y, color);
     board.flash(h);
     const sh = $('#shaker');
     sh.classList.remove('shake'); void sh.offsetWidth; sh.classList.add('shake');
+    if (live.on) { liveDart(h, ev); return; }
     if (h.m === 0) { callout('Raté', 'small'); return; }
     const pts = h.n * h.m;
     if (h.n === 25 && h.m === 2) { A.bull(); callout('<small>Dans le mille</small>BULL', 'gold'); }
@@ -378,18 +382,18 @@
   function events(ev, h) {
     ev.forEach((e) => {
       if (e.t === 'bust') {
-        callout('BUST', 'red'); A.bust();
+        announce('BUST', 'red'); A.bust(); say('Bust');
         const sh = $('#shaker'); sh.classList.remove('shake2'); void sh.offsetWidth; sh.classList.add('shake2');
         const card = view.cards[state.turn]; if (card) { card.classList.remove('shakeit'); void card.offsetWidth; card.classList.add('shakeit'); }
       } else if (e.t === '180') {
-        callout('<small>Maximum</small>180 !', 'gold'); A.big(); confetti(innerWidth / 2, innerHeight * 0.45, ['#f6d27a', '#e0a93b', '#fff'], 90, 1);
+        announce('<small>Maximum</small>180 !', 'gold'); A.big(); say('Cent quatre-vingts !'); confetti(innerWidth / 2, innerHeight * 0.45, ['#f6d27a', '#e0a93b', '#fff'], 90, 1);
       } else if (e.t === 'ton') {
-        callout(`<small>Belle volée</small>${e.v}`, 'gold'); A.big();
+        announce(`<small>Belle volée</small>${e.v}`, 'gold'); A.big();
       } else if (e.t === 'close') {
-        callout(`<small>Fermé</small>${e.n === 25 ? 'BULL' : e.n}`, 'green'); A.close();
+        announce(`<small>Fermé</small>${e.n === 25 ? 'BULL' : e.n}`, 'green'); A.close();
       } else if (e.t === 'points') floatText('+' + e.v, h, '#f6d27a');
       else if (e.t === 'advance' && state.phase !== 'over') floatText('+' + e.v, h, '#6ee7a6');
-      else if (e.t === 'win' && state.cfg.type === 'x01') callout('<small>Sortie</small>' + U.label(h), 'gold');
+      else if (e.t === 'win' && state.cfg.type === 'x01') announce('<small>Sortie</small>' + U.label(h), 'gold');
     });
   }
 
@@ -399,7 +403,45 @@
     wrap.appendChild(d);
     d.addEventListener('animationend', () => d.remove());
   }
+
+  /* --- mode caméra : annonces plein écran + voix --- */
+  const SPOKEN = (h) => (h.m === 0 ? 'Raté' : h.n === 25 ? (h.m === 2 ? 'Bull' : 'Vingt-cinq') : h.m === 3 ? 'Triple ' + h.n : h.m === 2 ? 'Double ' + h.n : String(h.n));
+  function say(text) {
+    if (!live.on || !live.speech || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'fr-FR'; u.rate = 1.05;
+      const v = speechSynthesis.getVoices().find((x) => /^fr/i.test(x.lang)); if (v) u.voice = v;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function bigPop(html, cls, ms) {
+    document.querySelectorAll('.bigpop').forEach((n) => n.remove());
+    const d = mk('div', 'bigpop ' + (cls || ''), `<div class="bp-in">${html}</div>`);
+    d.style.setProperty('--pc', state ? cur().color : '#f4c04e');
+    d.style.animationDuration = d.firstChild.style.animationDuration = (ms || 1500) + 'ms';
+    document.body.appendChild(d);
+    d.addEventListener('animationend', (e) => { if (e.target === d) d.remove(); });
+  }
+  function announce(html, cls) { if (live.on) bigPop(html, cls); else callout(html, cls); }
+  function liveDart(h, ev) {
+    const c = state.cfg, v = state.visit, pts = h.n * h.m;
+    const cls = h.n === 25 && h.m === 2 ? 'gold' : h.m === 3 ? 'red' : h.m === 2 ? 'green' : h.m === 0 ? 'dim' : '';
+    const lab = h.m === 0 ? 'Raté' : U.longLabel(h);
+    let main, em = '';
+    if (c.type === 'x01') {
+      main = h.m === 0 ? '–' : pts;
+      if (state.phase === 'visitDone' && !v.busted) em = 'Volée : ' + v.total;
+    } else if (c.type === 'cricket') {
+      main = h.m === 0 ? '–' : G.CRICKET.includes(h.n) ? (h.n === 25 ? 'BULL' : h.n) + ' ×' + h.m : '–';
+      const extra = v.total; if (extra) em = 'Points de la volée : ' + extra;
+    } else main = '';
+    if (c.type === 'clock') main = h.m === 0 ? 'Raté' : ev.some((e) => e.t === 'advance') ? 'Touché !' : '–';
+    bigPop(`<small>${lab}</small>${main}${em ? `<em>${em}</em>` : ''}`, cls, 1300);
+    say(SPOKEN(h));
+  }
   function floatText(txt, h, color) {
+    if (live.on) return;
     const [sx, sy] = board.toScreen(h.x, h.y);
     const d = mk('div', 'float', txt);
     d.style.left = sx + 'px'; d.style.top = sy - 40 + 'px';
@@ -410,6 +452,13 @@
   function turnPop() {
     if (!state) return;
     wrap.querySelectorAll('.turn-pop').forEach((n) => n.remove());
+    if (live.on) {
+      const p0 = cur(), c = state.cfg;
+      const info = c.type === 'x01' ? `Il te reste ${p0.score}` : c.type === 'clock' ? `Vise le ${G.CLOCK[Math.min(p0.idx, 20)] === 25 ? 'bull' : G.CLOCK[Math.min(p0.idx, 20)]}` : `${p0.points} points`;
+      bigPop(`<small>À toi</small>${esc(p0.name)}<em>${info}</em>`, 'turn', 2000);
+      say(`${p0.name}, ${info.toLowerCase()}`);
+      return;
+    }
     const p = cur(), d = mk('div', 'turn-pop', `<small>À toi</small>${esc(p.name)}`);
     d.style.setProperty('--pc', p.color);
     wrap.appendChild(d);
