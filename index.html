@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0a1a16">
+<title>OCHE — compteur de fléchettes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700;800&family=Young+Serif&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<svg id="defs-svg" width="0" height="0" style="position:absolute" aria-hidden="true"></svg>
+
+<div id="app">
+  <!-- ACCUEIL -->
+  <section id="home" class="screen">
+    <div class="home-hero">
+      <div class="brand">
+        <h1 class="logo">OCHE</h1>
+        <p class="tagline">Le compteur de fléchettes</p>
+      </div>
+      <div class="hero-board"><div class="hero-glow"></div><svg id="hero-board"></svg></div>
+    </div>
+    <div class="home-panel">
+      <div id="resume"></div>
+      <h2 class="step"><span>1</span>Le jeu</h2>
+      <div class="games" id="game-grid"></div>
+      <h2 class="step"><span>2</span>Les joueurs
+        <button class="mini" id="btn-shuffle" title="Mélanger l'ordre de passage">Mélanger</button></h2>
+      <div class="players" id="player-list"></div>
+      <h2 class="step"><span>3</span>Les règles</h2>
+      <div class="options" id="options"></div>
+      <button class="cta" id="btn-start"><span>Lancer la partie</span><i></i></button>
+    </div>
+  </section>
+
+  <!-- PARTIE -->
+  <section id="game" class="screen hidden">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="title"><b id="g-title">501</b><span id="g-sub"></span></div>
+      <div class="top-r">
+        <button class="icon-btn" id="btn-cam" aria-label="Caméra"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.6"/></svg><i class="cam-dot"></i></button>
+        <button class="icon-btn" id="btn-sound" aria-label="Son"></button>
+      </div>
+    </header>
+    <main class="game">
+      <aside class="scores" id="scores"></aside>
+      <section class="stage">
+        <div class="visit" id="visit">
+          <div class="v-who"><i class="dot"></i><span class="v-name"></span></div>
+          <div class="v-slots"><b class="slot"></b><b class="slot"></b><b class="slot"></b></div>
+          <div class="v-total"><small>Volée</small><b>0</b></div>
+        </div>
+        <div class="hint" id="hint"></div>
+        <div class="boardwrap" id="boardwrap">
+          <div class="shaker" id="shaker"><svg id="board"></svg></div>
+          <div class="readout" id="readout"></div>
+          <div class="loupe" id="loupe"><svg viewBox="-28 -28 56 56"><use href="#oche-art"/><g class="lp-cross"><path d="M0 -9V-3M0 3V9M-9 0H-3M3 0H9"/><circle r="1.1"/></g></svg></div>
+          <button class="campip hidden" id="campip" aria-label="Caméra"><canvas width="240" height="135"></canvas><span class="camstat"><i></i><b>…</b></span></button>
+          <div class="coach" id="coach">Pose le doigt sur la cible, glisse pour viser avec la loupe, relâche pour lancer</div>
+        </div>
+        <div class="controls">
+          <button class="btn ghost" id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-3"/></svg>Annuler</button>
+          <button class="btn ghost" id="btn-miss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>Raté</button>
+          <button class="btn primary" id="btn-next"><span>Joueur suivant</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- MODALES -->
+  <div class="modal hidden" id="menu">
+    <div class="sheet">
+      <h3>Pause</h3>
+      <div class="rules" id="rules"></div>
+      <div class="sheet-actions">
+        <button class="btn primary" id="m-resume">Reprendre</button>
+        <button class="btn ghost" id="m-restart">Recommencer</button>
+        <button class="btn ghost" id="m-quit">Quitter la partie</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal hidden" id="win">
+    <div class="sheet winner" id="win-sheet"></div>
+  </div>
+  <div class="modal hidden" id="cam"><div class="sheet cam" id="cam-sheet"></div></div>
+  <canvas id="confetti"></canvas>
+</div>
+
+<script src="js/games.js"></script>
+<script src="js/board.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/app.js"></script>
+<script src="js/camera.js"></script>
+</body>
+</html>
